@@ -221,7 +221,7 @@ class CLI:
                     raise ValueError()
 
             except ValueError:
-                print(f'Integers in range from 0 to {len(self.comix.image_list)-1}')
+                print(f'Integers in range from 0 to {len(self.comix.image_list())-1}')
                 sleep(0.7)
                 self.clear()
                 return
@@ -251,8 +251,8 @@ class CLI:
                 return
 
             elif selected == '2':
-                temp_images = list(filter(lambda img: img.position != -1, self.comix.image_list))
-                temp_images.sort(key=PImage.position)
+                temp_images = list(filter(lambda img: img.position != -1, self.comix.image_list()))
+                temp_images.sort(key=PImage.sorted_pos)
 
                 try:
                     new_position = int(input('new position> '))
