@@ -21,15 +21,13 @@ class PImage:
 
     @classmethod
     def load(cls, path, position):
-        try:
-            name = pathlib.Path(path).stem
-            f = open(path, 'rb')
-            opened_files.append(f)
-            img = Image.open(f)
-            date = os.path.getmtime(path)
-            return cls(date, img, position, name)
-        except Exception as e:
-            print(e)
+        f = open(path, 'rb')
+        opened_files.append(f)
+        img = Image.open(f)
+
+        name = pathlib.Path(path).stem
+        date = os.path.getmtime(path)
+        return cls(date, img, position, name)
 
     @staticmethod
     def sorter_date(p_image):
@@ -60,10 +58,13 @@ class PComix:
         for n, img in enumerate(img_paths):
             if not os.path.isfile(img):
                 continue
+            try:
+                loaded_img = PImage.load(img, n)
+                self.images.append(loaded_img)
 
-            loaded_img = PImage.load(img, n)
-            self.images.append(loaded_img)
-
+            except Exception as e:
+                continue
+    @property
     def image_list(self):
         return self.images
 
@@ -97,9 +98,12 @@ class CLI:
     def __init__(self):
         self.name = 'Default'
         self.comix: PComix = None
+
         self.context = Context.load_pages
         self.selected_img = 0
+
         self.with_manual = False
+        self.reverce = False
         self.run = True
 
         while self.run:
@@ -124,50 +128,29 @@ class CLI:
 
     def render_interface(self):
         if self.context == Context.load_pages:
-            print(
-                'ComiXPDF by @rud356\n',
-                f'Loaded comix: {self.comix is not None}',
-                f'Comix name: {self.name}',
-                '1) Load comix folder',
-                sep='\n'
-                )
+            self.load_pages()
 
-            if self.comix is not None:
-                print(
-                '2) set output name',
-                '3) sort by names',
-                '4) sort by dates',
-                '5) sort by manual position',
-                '6) render comix',
-                '7) Images manager',
-                sep='\n'
-                )
+            selected = input('> ')
 
-            print(
-                f'm) Manual sort mode: {self.with_manual}',
-                'x) close program',
-                sep='\n'
-                )
+            if selected == 'm':
+                self.with_manual = not self.with_manual
+                self.clear()
+                return
+
+            if selected == 'x':
+                self.run = False
+                self.clear()
+                return
 
             try:
-                selected = input('> ')
-                if selected == 'm':
-                    self.with_manual = not self.with_manual
-                    self.clear()
-                    return
-
-                if selected == 'x':
-                    self.run = False
-                    self.clear()
-                    return
-
                 selected = int(selected)
+
                 if selected not in range(1, 8):
                     raise ValueError()
 
             except ValueError:
                 print('Must be an int beetwin 1 and 7 inclusive!')
-                sleep(0.7)
+                sleep(1.2)
                 self.clear()
                 return
 
@@ -183,30 +166,31 @@ class CLI:
                 return
 
             if selected == 6:
-                print('Rendering pdf in progress...')
-                self.comix.create_pdf(self.name)
-                print('Finished!')
+                self.render_pdf()
                 sleep(0.7)
                 self.clear()
                 return
 
-            _ = {
+            options = {
                 1: self.load_comix,
                 2: self.comix_name,
             }
+
             if self.comix is not None:
-                _.update({
+                options.update({
                     3: self.comix.sort_names,
                     4: self.comix.sort_time,
                     5: self.comix.sort_position,
                 })
-            _.get(selected, self.unknown)()
+
+            options.get(selected, self.unknown)()
 
         elif self.context == Context.image_selection:
             print('x) to main page')
-            for n, img_info in enumerate(self.comix.image_list()):
+
+            for n, img_info in enumerate(self.comix.image_list):
                 print(
-                    f'{n}) {img_info.filename} | manual position {img_info.position}'
+                    f'{n:<3}) {img_info.filename} | manual position {img_info.position}'
                 )
 
             selected = input('> ')
@@ -217,11 +201,11 @@ class CLI:
 
             try:
                 selected = int(selected)
-                if not (0 <= selected < len(self.comix.image_list())):
+                if not (0 <= selected < len(self.comix.image_list)):
                     raise ValueError()
 
             except ValueError:
-                print(f'Integers in range from 0 to {len(self.comix.image_list())-1}')
+                print(f'Integers in range from 0 to {len(self.comix.image_list)-1}')
                 sleep(0.7)
                 self.clear()
                 return
@@ -230,13 +214,22 @@ class CLI:
             self.context = Context.image_selected
 
         elif self.context == Context.image_selected:
-            image: PImage = self.comix.image_list()[self.selected_img]
+            image: PImage = self.comix.image_list[self.selected_img]
+
             print(
                 ' x) to image selection',
                 ' 1) show image',
                 ' 2) set position',
                 sep='\n'
             )
+
+            if image.position == -1:
+                enabled = False
+                print(' 3) enable image')
+
+            else:
+                enabled = True
+                print(' 3) disable image')
 
             selected = input('> ')
 
@@ -251,27 +244,34 @@ class CLI:
                 return
 
             elif selected == '2':
-                temp_images = list(filter(lambda img: img.position != -1, self.comix.image_list()))
+                temp_images = self.manually_sorted
                 temp_images.sort(key=PImage.sorted_pos)
 
                 try:
                     new_position = int(input('new position> '))
-                    if new_position > -1:
+                    if -1 < new_position < len(temp_images):
+                        previous_position = image.position
                         image.position = new_position
 
                         for img in temp_images:
-                            img.position += 1
-
-                    elif new_position == -1:
-                        image.position = new_position
+                            if previous_position < img.position < new_position:
+                                img.position -= 1
 
                     else:
                         raise ValueError()
 
                 except ValueError:
-                    print('Position should be >= -1')
-                    sleep(0.7)
+                    print(f'Position should in range from 0 to {len(temp_images)-1}')
+                    sleep(1.2)
                     self.clear()
+
+            elif selected == '3':
+                if enabled:
+                    image.position = -1
+
+                else:
+                    temp_images = self.manually_sorted
+                    image.position = len(temp_images)
 
             else:
                 self.unknown()
@@ -279,6 +279,45 @@ class CLI:
         else:
             self.unknown()
 
+        self.clear()
+
+    @property
+    def manually_sorted(self):
+        return list(filter(
+            lambda img: img.position != -1,
+            self.comix.image_list
+        ))
+
+    def load_pages(self):
+        print(
+            'ComiXPDF by @rud356\n',
+            f'Loaded comix: {self.comix is not None}',
+            f'Comix name: {self.name}',
+            '1) Load comix folder',
+            sep='\n'
+        )
+
+        if self.comix is not None:
+            print(
+                '2) set output name',
+                '3) sort by names',
+                '4) sort by dates',
+                '5) sort by manual position',
+                '6) render comix',
+                '7) Images manager',
+                sep='\n'
+            )
+
+        print(
+            f'm) Switch manual sort mode | current: {self.with_manual}',
+            'x) close program',
+            sep='\n'
+        )
+
+    def render_pdf(self):
+        print('Rendering pdf in progress...')
+        self.comix.create_pdf(self.name)
+        print('Finished!')
 
     def load_comix(self):
         self.name = "Default"
