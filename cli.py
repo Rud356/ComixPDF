@@ -137,7 +137,8 @@ class CLI:
             "1. Show image",
             "2. To main menu",
             "3. To image selection",
-            f"4. {enable_or_disable} image from render"
+            f"4. {enable_or_disable} image from render",
+            sep='\n'
         )
 
         options = {
