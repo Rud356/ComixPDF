@@ -162,7 +162,7 @@ class CLI:
     def title(self, value):
         if len(value) > 245:
             raise ValueError("Too long name")
-        self.title = value
+        self._title = value
 
     #? If command isn't right
     def unknown_command(self):
@@ -222,7 +222,7 @@ class CLI:
         self.Comix.sorted_by_names(self.reverse)
 
     def run_render(self):
-        if len(self.Comix.images):
+        if not len(self.Comix.images):
             print("Sorry, but there's no images to render into pdf")
             sleep(0.65)
             return
