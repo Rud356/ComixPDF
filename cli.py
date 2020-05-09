@@ -35,6 +35,7 @@ class CLI:
         self.reverse = False
         self.selected_image = 0
 
+        clear()
         while self.run:
             print('Welcome to ComixPDF 1.1! Created by @Rud356')
             print('Press x to close program')
