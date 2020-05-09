@@ -5,7 +5,7 @@ from image import CMXImage
 class PComix:
     def __init__(self, path, images):
         self.path = path
-        self.title = 'Untitled'
+        self._title = 'Untitled'
         self.images: List[CMXImage] = images
 
     @classmethod
@@ -32,11 +32,11 @@ class PComix:
 
     @property
     def title(self):
-        return self.title
+        return self._title
 
     @title.setter
     def title(self, value):
-        self.title = str(value)
+        self._title = str(value)
 
     def sorted_by_order(self, reverse=False):
         self.images.sort(key=CMXImage.position, reverse=reverse)
@@ -45,13 +45,13 @@ class PComix:
                 image.position = n
 
     def sorted_by_names(self, reverse=False):
-        self.images.sort(key=CMXImage.name, reverse=reverse)
+        self.images.sort(key=lambda img: img.name, reverse=reverse)
         for n, image in enumerate(self.images):
             if image.position != -1:
                 image.position = n
 
     def sorted_by_dates(self, reverse=False):
-        self.images.sort(key=CMXImage.modified_date, reverse=reverse)
+        self.images.sort(key=lambda img: img.modified_date, reverse=reverse)
         for n, image in enumerate(self.images):
             if image.position != -1:
                 image.position = n

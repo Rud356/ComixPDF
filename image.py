@@ -15,9 +15,9 @@ class CMXImage:
     def __init__(self, path: pathlib.Path):
         self.path: pathlib.Path = path
         self.image = Image.open(path)
-        self.thumbnail = None
+        self._thumbnail = None
         # -1 stands for dequeued
-        self.position = None
+        self._position = -1
 
     @property
     def name(self):
@@ -29,11 +29,11 @@ class CMXImage:
 
     @property
     def thumbnail(self):
-        if not self.thumbnail:
-            self.thumbnail = Image.open(self.path)
-            self.thumbnail.thumbnail(T_SIZE)
+        if not self._thumbnail:
+            self._thumbnail = Image.open(self.path)
+            self._thumbnail.thumbnail(T_SIZE)
 
-        return self.thumbnail
+        return self._thumbnail
 
     @property
     def ConvertedImage(self):
@@ -57,8 +57,8 @@ class CMXImage:
 
     @property
     def position(self):
-        return self.position
+        return self._position
 
     @position.setter
     def position(self, value):
-        self.position = value
+        self._position = value

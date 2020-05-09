@@ -7,9 +7,9 @@ from enum import IntEnum
 
 parser = argparse.ArgumentParser(description="It's CLI version of ComixPDF")
 parser.add_argument('--path', '-p', type=str, action='store', dest='path')
-parser.add_argument('--title', '-t', type=str, action='store', defaut='Undefined', dest='title')
-parser.add_argument('--order_names', '-o_n', type=bool, dest='ordered_by_names', defaut=False)
-parser.add_argument('--reverse', '-r', type=bool, dest='reverse', defaut=False)
+parser.add_argument('--title', '-t', type=str, action='store', default='Undefined', dest='title')
+parser.add_argument('--order_names', '-o_n', type=bool, dest='ordered_by_names', default=False)
+parser.add_argument('--reverse', '-r', type=bool, dest='reverse', default=False)
 
 
 def clear():
@@ -28,7 +28,7 @@ class CLIContext(IntEnum):
 class CLI:
     def __init__(self):
         self.run = True
-        self.title = 'Untitled'
+        self._title = 'Untitled'
         self.Comix: PComix = None
         self.context = CLIContext.start
 
@@ -54,7 +54,7 @@ class CLI:
             self.image_selection_context()
 
         elif self.context == CLIContext.image_selected:
-            pass
+            self.image_selected_context()
 
         else:
             print(
@@ -102,7 +102,7 @@ class CLI:
         func()
 
     def image_selection_context(self):
-        for n, image in enumerate(self.Comix.images):
+        for n, image in enumerate(self.Comix.images, start=1):
             print(f'{n:<4} => {image.name:<25}')
 
         print(
@@ -154,7 +154,7 @@ class CLI:
 
     @property
     def title(self):
-        return self.title
+        return self._title
 
     @title.setter
     def title(self, value):
@@ -165,7 +165,7 @@ class CLI:
     #? If command isn't right
     def unknown_command(self):
         print("Sorry, but there's no such command")
-        sleep(0.45)
+        sleep(0.75)
 
     #? Context swithces
     def to_main_menu(self):
