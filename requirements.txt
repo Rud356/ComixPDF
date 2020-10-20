@@ -1,1 +1,3 @@
 Pillow
+wxwidgets~=1.0.5
+betterconf~=2.5.0
