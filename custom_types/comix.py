@@ -1,5 +1,6 @@
 import pathlib
 import logging
+import atexit
 from typing import List
 
 from PIL import Image
@@ -16,7 +17,8 @@ class ComixPDF:
         if not comix_path.is_dir():
             raise self.exc.PathIsNotADir("You've provided path that isn't a real directory")
 
-        self._title = "untitled.pdf"
+        self._title = "untitled"
+        self.sorting_reverse = config.reversed_sorting
         self.sorting_mode = config.default_sort_mode
         self.initial_path: pathlib.Path = comix_path
         self._output_path: pathlib.Path = comix_path / self._title
@@ -37,6 +39,7 @@ class ComixPDF:
             "%(loaded_num) images has been loaded from dir %(initial_path)",
             initial_path=self.initial_path, loaded_num=len(self.images)
         )
+        atexit.register(self.__del__)
 
     @property
     def title(self) -> str:
@@ -66,14 +69,24 @@ class ComixPDF:
             self._output_path = path / self._title
 
         else:
-            raise ValueError("Invalid path for pdf output")
+            raise self.exc.PathIsNotADir("Invalid path for pdf output")
+
+    @property
+    def listed_images(self):
+        images: List[ComixImage] = list(filter(lambda img: img.included, self.images))
+        self.sort_pages(images)
+
+        return images
 
     @property
     def unlisted_images(self):
-        return list(filter(lambda img: not img.included, self.images))
+        unlisted = list(filter(lambda img: not img.included, self.images))
+        self.sort_pages(unlisted)
+
+        return unlisted
 
     def sort_pages(self, pages: List[ComixImage]):
-        pages.sort(key=self.sorting_mode, reverse=config.reversed_sorting)
+        pages.sort(key=self.sorting_mode, reverse=self.sorting_reverse)
 
     def set_sorting_mode(self, name: str):
         try:
@@ -83,8 +96,7 @@ class ComixPDF:
             raise ValueError("Invalid sorting method name")
 
     def render(self):
-        images: List[ComixImage] = list(filter(lambda img: img.included, self.images))
-        self.sort_pages(images)
+        images: List[ComixImage] = self.listed_images
 
         if not len(images):
             raise ValueError("No images to render")
@@ -98,6 +110,10 @@ class ComixPDF:
             append_images=[image.convert() for image in images],
             **first_page_info
         )
+
+    def __del__(self):
+        del self.images
+        del self
 
     class exc:
         class PathIsNotADir(ValueError):

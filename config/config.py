@@ -1,10 +1,11 @@
-import pathlib
 import atexit
-from functools import partial
+import pathlib
 from configparser import ConfigParser
+from functools import partial
 
 from betterconf import field, Config, caster
 from betterconf.config import AbstractProvider, Field
+
 from custom_types.image_sorters import ImageSorterKeys
 
 config_file_path = pathlib.Path(__file__).parent / "config.cfg"
