@@ -1,5 +1,5 @@
 import pathlib
-from typing import Any
+import atexit
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -18,6 +18,7 @@ class ComixImage:
 
     def __post_init__(self):
         self._open_image()
+        atexit.register(self.__del__)
 
     def _open_image(self):
         try:
@@ -27,15 +28,15 @@ class ComixImage:
             raise ValueError("Invalid image path")
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.path.stem
 
     @property
-    def modification_timestamp(self):
+    def modification_timestamp(self) -> float:
         return self.path.lstat().st_mtime
 
     @property
-    def position(self):
+    def position(self) -> int:
         return self._position
 
     @position.setter
@@ -43,7 +44,7 @@ class ComixImage:
         self._position = value
 
     @lru_cache(1)
-    def thumbnail(self, size=config.thumbnails_size):
+    def thumbnail(self, size=config.thumbnails_size) -> Image:
         return self.image.thumbnail(size)
 
     def convert(self):
@@ -56,3 +57,10 @@ class ComixImage:
 
         finally:
             return self.image
+
+    def __str__(self):
+        return f"{self.position}. {self.name} | {self.path}"
+
+    def __del__(self):
+        del self.image
+        self.thumbnail.cache_clear()
