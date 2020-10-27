@@ -11,6 +11,10 @@ from custom_types.image_sorters import ImageSorterKeys
 config_file_path = pathlib.Path(__file__).parent / "config.cfg"
 
 
+class ConfigInit:
+    _warmup_run = True
+
+
 class ConfigparserProvider(AbstractProvider):
     def __init__(self, config_path):
         self.config = ConfigParser()
@@ -24,7 +28,7 @@ field = partial(field, provider=ConfigparserProvider(config_file_path))
 
 
 class ResolutionCaster(caster.AbstractCaster):
-    def cast(self, val):
+    def cast(self, val='512x512', *_, **__):
         try:
             return [int(i) for i in val.split('x', 1)][:2]
 
@@ -33,8 +37,8 @@ class ResolutionCaster(caster.AbstractCaster):
 
 
 class ImageSorterCaster(caster.AbstractCaster):
-    def cast(self, sorter: str):
-        getattr(ImageSorterKeys, sorter, ImageSorterKeys.modification_timestamp_key)
+    def cast(self, val='', *_, **__):
+        return getattr(ImageSorterKeys, val, ImageSorterKeys.modification_timestamp_key)
 
 
 class ComixPDFConfig(Config):
@@ -42,32 +46,42 @@ class ComixPDFConfig(Config):
     # Image loading
     cache_thumbnails: bool = field('cache_thumbnails', caster=caster.to_bool)
     thumbnails_size: list = field('thumbnails_size', caster=ResolutionCaster)
-    border_size: int = field(caster=caster.to_int)
+    border_size: int = field(caster=caster.to_int, default=15)
 
     # Comix loading
-    _default_sort_mode: callable = field(caster=ImageSorterCaster)
+    default_sort_mode = field('default_sort_mode', caster=ImageSorterCaster)
     reversed_sorting: bool = field(caster=caster.to_bool, default=False)
 
     # Comix optimizations
     optimized: bool = field(caster=caster.to_bool, default=True)
 
     # Logs
-    log_path: str = field(default='~./comix_pdf.log')
+    log_path: str = field(default='comix_pdf.log')
     log_level: str = field(default='ERROR')
 
     @property
-    def default_sort_mode(self):
-        return self._default_sort_mode
+    def default_sort_mode_(self):
+        return self.default_sort_mode
 
-    @default_sort_mode.setter
-    def default_sort_mode(self, value):
+    @default_sort_mode_.setter
+    def default_sort_mode_(self, val=''):
         try:
-            self.default_sort_mode = getattr(ImageSorterKeys, value)
+            self.default_sort_mode_ = getattr(
+                ImageSorterKeys, val,
+                ImageSorterKeys.modification_timestamp_key
+            )
 
         except AttributeError:
             raise ValueError("Invalid sorting method name")
 
-    def dump_config(self):
+        except TypeError:
+            pass
+
+    def dump_config(self, *_, **__):
+        if ConfigInit._warmup_run:
+            ConfigInit._warmup_run = False
+            return {}
+
         config_temp = ConfigParser()
         config_temp.add_section('ComixPDF')
 
@@ -88,6 +102,6 @@ class ComixPDFConfig(Config):
 
 
 config = ComixPDFConfig()
-atexit.register(config.dump_config())
+atexit.register(config.dump_config)
 
 __all__ = ["config"]

@@ -1,5 +1,6 @@
 import pathlib
 import atexit
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -43,9 +44,11 @@ class ComixImage:
     def position(self, value):
         self._position = value
 
-    @lru_cache(1)
     def thumbnail(self, size=config.thumbnails_size) -> Image:
-        return self.image.thumbnail(size)
+        thumbnail = deepcopy(self.image)
+        thumbnail.thumbnail(size)
+
+        return thumbnail
 
     def convert(self):
         size = [res + config.borders_size*2 for res in self.image.size]
@@ -62,5 +65,4 @@ class ComixImage:
         return f"{self.position}. {self.name} | {self.path}"
 
     def __del__(self):
-        del self.image
-        self.thumbnail.cache_clear()
+        self.image = None
