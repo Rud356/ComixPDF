@@ -18,6 +18,7 @@ READ_BEFORE_LEAVE = 0.765
 
 IMAGES_PER_PAGE = 5
 
+
 def clear():
     os.system('cls') if os.name == 'nt' else os.system('clear')
 
@@ -84,7 +85,7 @@ class CLI:
                 try:
                     self.comix = ComixPDF(path)
 
-                except ComixPDF.exc.PathIsNotADir:
+                except ComixPDF.exc.InvalidPath:
                     print("Entered path is not a directory")
                     sleep(NOTICE_BEFORE_LEAVE)
 
@@ -115,7 +116,7 @@ class CLI:
                 try:
                     self.comix.output_path = path
 
-                except ComixPDF.exc.PathIsNotADir:
+                except ComixPDF.exc.InvalidPath:
                     print("Entered path is not a directory")
                     sleep(NOTICE_BEFORE_LEAVE)
 

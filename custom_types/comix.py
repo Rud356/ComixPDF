@@ -15,15 +15,15 @@ class ComixPDF:
         comix_path = pathlib.Path(comix_path)
 
         if not comix_path.is_dir():
-            raise self.exc.PathIsNotADir("You've provided path that isn't a real directory")
+            raise self.exc.InvalidPath("You've provided path that isn't a real directory")
 
         self._title = "untitled"
         self.sorting_reverse = config.reversed_sorting
-        self.sorting_mode = config.default_sort_mode
+        self.sorting_mode = config.default_sort_mode_
         self.initial_path: pathlib.Path = comix_path
         self._output_path: pathlib.Path = comix_path / self._title
 
-        logging.info("%(initial_path) is loaded comics dir", initial_path=self.initial_path)
+        logging.info(f"{self.initial_path} is loaded comics dir")
 
         self.images: List[ComixImage] = []
 
@@ -36,8 +36,7 @@ class ComixPDF:
                 pass
 
         logging.debug(
-            "%(loaded_num) images has been loaded from dir %(initial_path)",
-            initial_path=self.initial_path, loaded_num=len(self.images)
+            f"{self.initial_path} images has been loaded from dir {len(self.images)}",
         )
         atexit.register(self.__del__)
 
@@ -55,7 +54,7 @@ class ComixPDF:
             self._title += '.pdf'
 
         self._output_path = self._output_path.parent / self._title
-        logging.debug("%s new title for comix at %(init_path)", self._title, init_path=self.initial_path)
+        logging.debug(f"{self._title} new title for comix at {self.initial_path}")
 
     @property
     def output_path(self) -> pathlib.Path:
@@ -68,8 +67,12 @@ class ComixPDF:
         if path.is_dir():
             self._output_path = path / self._title
 
+        elif path.parent.exists():
+            self._output_path = path
+            self._title = path.stem
+
         else:
-            raise self.exc.PathIsNotADir("Invalid path for pdf output")
+            raise self.exc.InvalidPath("Invalid output path")
 
     @property
     def listed_images(self):
@@ -116,5 +119,5 @@ class ComixPDF:
         del self
 
     class exc:
-        class PathIsNotADir(ValueError):
+        class InvalidPath(ValueError):
             pass
