@@ -1,8 +1,9 @@
-import pathlib
+import io
+import tempfile
 import atexit
+import pathlib
 from copy import deepcopy
 from dataclasses import dataclass
-from functools import lru_cache
 
 from PIL import Image
 
@@ -51,18 +52,20 @@ class ComixImage:
         return thumbnail
 
     def convert(self):
-        size = [res + config.borders_size*2 for res in self.image.size]
-        new_img = Image.new('RGB', size, (255, 255, 255))
+        new_img = Image.new('RGB', self.image.size, (255, 255, 255))
 
         try:
-            new_img.paste(self.image, mask=self.image.split()[3], box=[config.borders_size]*4)
+            new_img.paste(self.image, mask=self.image.split()[3])
             self.image = new_img
 
         finally:
             return self.image
 
     def __str__(self):
-        return f"{self.position}. {self.name} | {self.path}"
+        name = self.name[:40]
+        is_included = ("yes" if self.included else "no").center(12)
+
+        return f"{self.position:<5} | {is_included} | {name:<40} | {self.path}"
 
     def __del__(self):
         self.image = None

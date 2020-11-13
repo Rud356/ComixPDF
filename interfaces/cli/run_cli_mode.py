@@ -12,7 +12,7 @@ from custom_types.image import ComixImage
 # TODO: add translations
 # Below listed sleep delays to switch contexts and etc.
 # Should be about right fast enough to read text
-QUICK_LEAVE = 0.35
+QUICK_LEAVE = 0.43
 NOTICE_BEFORE_LEAVE = 0.5
 READ_BEFORE_LEAVE = 0.765
 
@@ -29,12 +29,13 @@ def unknown_command():
 
 
 def goodbye():
+    clear()
     print("See you soon and good luck!")
     sleep(QUICK_LEAVE)
 
 
 def exclude_keys(*keys, _dict: dict):
-    return {k: v in keys for k, v in _dict if k in keys}
+    return {k: v for k, v in _dict.items() if k not in keys}
 
 
 class Context(Enum):
@@ -67,10 +68,10 @@ class CLI:
             self.start_context()
 
         elif self.context == Context.image_manager:
-            pass
+            self.image_manager()
 
         elif self.context == Context.image_selected:
-            pass
+            self.image_selected()
 
         else:
             print("How the hell you got there?")
@@ -189,19 +190,20 @@ class CLI:
             @staticmethod
             def reverse_sorting():
                 nonlocal self
-                self.comix.sorting_mode = not self.comix.sorting_mode
+                self.comix.sorting_reverse = not self.comix.sorting_reverse
 
             @staticmethod
             def select_image():
                 nonlocal self
                 try:
                     image_pick = int(input("select image: "))
+
                 except ValueError:
                     print("Please, input index of image you want to pick")
                     sleep(QUICK_LEAVE)
                     return
 
-                if image_pick in range(len(self.comix.images)):
+                if image_pick not in range(len(self.comix.images)):
                     print("Please, input valid index of image")
                     sleep(QUICK_LEAVE)
                     return
@@ -215,7 +217,7 @@ class CLI:
             @staticmethod
             def change_page():
                 nonlocal self
-                pages_count = ceil(len(self.comix.images) / IMAGES_PER_PAGE)
+                pages_count = self.pages_count
 
                 try:
                     page = int(input("Type page number: ")) - 1
@@ -234,7 +236,7 @@ class CLI:
             @staticmethod
             def next_page():
                 nonlocal self
-                pages_count = ceil(len(self.comix.images) / IMAGES_PER_PAGE)
+                pages_count = self.pages_count
                 page = self.images_page + 1
 
                 if page not in range(pages_count):
@@ -246,7 +248,7 @@ class CLI:
             @staticmethod
             def previous_page():
                 nonlocal self
-                pages_count = ceil(len(self.comix.images) / IMAGES_PER_PAGE)
+                pages_count = self.pages_count
                 page = self.images_page - 1
 
                 if page not in range(pages_count):
@@ -279,9 +281,13 @@ class CLI:
             sep='\n'
         )
 
-        sorted_images = self.comix.listed_images + self.comix.unlisted_images
+        sorted_images = self.comix.all_images
         pages_offset = self.images_page*IMAGES_PER_PAGE
+
+        print(f"pos   | is included? | {'image name':<40} | path")
         print(*sorted_images[pages_offset:pages_offset+IMAGES_PER_PAGE], sep='\n')
+        print(f"Current position {self.images_page+1}/{self.pages_count}")
+
         option = options.get(input("Choose option: "), unknown_command)
         option()
 
@@ -320,9 +326,10 @@ class CLI:
         }
 
         cmx_image: ComixImage = self.comix.images[self.selected_image_position]
+        print(f"Selected image:\n  > {cmx_image.name}\n  > {cmx_image.path}")
         print(
             "1) Go back to image manager",
-            "2) GO back to main menu",
+            "2) Go back to main menu",
             f"3) {'Exclude' if cmx_image.included else 'Include'} image to final pdf file",
             "4) Show image",
             sep='\n'
@@ -330,3 +337,7 @@ class CLI:
 
         option = options.get(input("Choose option: "), unknown_command)
         option()
+
+    @property
+    def pages_count(self):
+        return ceil(len(self.comix.images) / IMAGES_PER_PAGE)
