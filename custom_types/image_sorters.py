@@ -9,12 +9,21 @@ if TYPE_CHECKING:
 class ImageSorterKeys:
     @staticmethod
     def position_key(image: ComixImage):
-        return image.position
+        # If image is excluded from render - we move it
+        # to the bottom of list
+        is_not_excluded = not image.included
+        return is_not_excluded, image.position
 
     @staticmethod
     def modification_timestamp_key(image: ComixImage):
-        return image.modification_timestamp
+        # If image is excluded from render - we move it
+        # to the bottom of list
+        is_not_excluded = not image.included
+        return is_not_excluded, image.modification_timestamp
 
     @staticmethod
     def title_key(image: ComixImage):
-        return image.name
+        # If image is excluded from render - we move it
+        # to the bottom of list
+        is_not_excluded = not image.included
+        return is_not_excluded, image.name

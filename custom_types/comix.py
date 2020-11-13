@@ -1,13 +1,13 @@
-import pathlib
-import logging
 import atexit
+import logging
+import pathlib
 from typing import List
 
 from PIL import Image
 
+from config import config
 from .image import ComixImage
 from .image_sorters import ImageSorterKeys
-from config import config
 
 
 class ComixPDF:
@@ -17,7 +17,7 @@ class ComixPDF:
         if not comix_path.is_dir():
             raise self.exc.InvalidPath("You've provided path that isn't a real directory")
 
-        self._title = "untitled"
+        self._title = "untitled.pdf"
         self.sorting_reverse = config.reversed_sorting
         self.sorting_mode = config.default_sort_mode_
         self.initial_path: pathlib.Path = comix_path
@@ -75,21 +75,33 @@ class ComixPDF:
             raise self.exc.InvalidPath("Invalid output path")
 
     @property
+    def all_images(self):
+        self.sort_pages()
+
+        return self.images
+
+    @property
     def listed_images(self):
+        self.sort_pages()
         images: List[ComixImage] = list(filter(lambda img: img.included, self.images))
-        self.sort_pages(images)
 
         return images
 
     @property
     def unlisted_images(self):
+        self.sort_pages()
         unlisted = list(filter(lambda img: not img.included, self.images))
-        self.sort_pages(unlisted)
 
         return unlisted
 
-    def sort_pages(self, pages: List[ComixImage]):
+    def update_positions(self):
+        for n, page in enumerate(self.images):
+            page.position = n
+
+    def sort_pages(self):
+        pages = self.images
         pages.sort(key=self.sorting_mode, reverse=self.sorting_reverse)
+        self.update_positions()
 
     def set_sorting_mode(self, name: str):
         try:
@@ -105,17 +117,17 @@ class ComixPDF:
             raise ValueError("No images to render")
 
         first_page: Image = images.pop(0).convert()
+        converted_images = [image.convert() for image in images]
         first_page_info = first_page.info
 
         first_page.save(
             self.output_path, 'PDF', optimized=config.optimized,
             quality=100, resolution=100, save_all=True,
-            append_images=[image.convert() for image in images],
+            append_images=converted_images,
             **first_page_info
         )
 
     def __del__(self):
-        del self.images
         del self
 
     class exc:
