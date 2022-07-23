@@ -8,6 +8,9 @@ from transitions import Machine
 from comix_pdf.types import Comics
 from .states import states
 
+# How many images can be displayed on one page in menus
+IMAGES_PER_PAGE = 8
+
 
 class ComixCLI:
     state: str
@@ -44,6 +47,9 @@ class ComixCLI:
                 "empty comics created",
                 "set output name",
                 "set output path",
+                "set printing resolution",
+                "set images quality",
+                "images manager",
                 "rendering pdf",
             ],
             dest="loaded comics menu"
@@ -65,6 +71,28 @@ class ComixCLI:
         self.machine.add_transition(
             trigger="set_images_quality", source="loaded comics menu",
             dest="set images quality"
+        )
+        self.machine.add_transition(
+            trigger="image_manager_menu", source="loaded comics menu",
+            dest="images manager"
+        )
+        self.machine.add_transition(
+            trigger="render_comics", source="loaded comics menu",
+            dest="rendering comics"
+        )
+
+        # Image manager states
+        self.machine.add_transition(
+            trigger="exclude_selected_images", source="images manager",
+            dest="exclude images"
+        )
+        self.machine.add_transition(
+            trigger="select_image", source="images manager",
+            dest="actions on image"
+        )
+        self.machine.add_transition(
+            trigger="insert_images", source="images manager",
+            dest="insert images"
         )
 
         # Start CLI
@@ -217,6 +245,18 @@ class ComixCLI:
         self.comics_loaded_menu()
 
     def images_manager_menu(self):
+        pass
+
+    def select_image(self):
+        pass
+
+    def exclude_selected_images(self):
+        pass
+
+    def insert_images(self):
+        pass
+
+    def render_comics(self):
         pass
 
     def close_loaded_comics(self):
