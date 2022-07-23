@@ -6,9 +6,9 @@ states = [
     "set output name",
     "set output path",
     "set printing resolution",
-    "set images quality"
+    "set images quality",
     "images manager",
-    "actions on image menu",
+    "actions on image",
     "insert images",
     "move image to index",
     "exclude images",
