@@ -2,7 +2,7 @@
 Contains ComicsImages class that adds more functionality to Pil.Image.Image
 class.
 """
-
+from copy import copy
 from pathlib import Path
 
 from PIL import Image
@@ -10,7 +10,7 @@ from PIL import Image
 from .fill_color import FillColor
 
 
-class ComicsImage(Image.Image):
+class ComicsImage:
     """
     Type for image for comics' collection.
     """
@@ -27,19 +27,18 @@ class ComicsImage(Image.Image):
         self.path: Path = path
 
         # Validating that file is actually an image
-        with Image.open(path) as _img:
-            _img: Image.Image
-            _img.verify()
+        self._img: Image.Image = Image.open(path)
+        copy(self._img).verify()
 
-    def convert_to_rgba(self) -> Image:
+    def convert_to_rgb(self) -> Image:
         """
         Returns copy of image in RGBA format.
 
         :return: Image instance with RGBA type.
         """
-        return self.convert("RGBA")
+        return self._img.convert("RGB")
 
-    def convert_with_fill_color(
+    def convert_to_rgb_with_fill_color(
         self, fill_color: FillColor = FillColor(255, 255, 255)
     ) -> Image:
         """
@@ -50,23 +49,14 @@ class ComicsImage(Image.Image):
         :return: Image instance with RGBA type.
         """
 
-        if self.mode == "RGBA":
-            transparency = self.split()[3]
-            new_img = Image.new('RGB', self.image.size, fill_color)
+        if self._img.mode == "RGBA":
+            transparency = self._img.split()[3]
+            new_img = Image.new('RGB', self._img.image.size, fill_color)
             new_img.paste(self, mask=transparency)
             return new_img
 
         else:
-            return self.convert("RGB")
-
-    def load_image(self) -> None:
-        """
-        Loads image from disk to memory.
-
-        :return: nothing.
-        """
-        with open(self.path, "rb") as img:
-            self.frombytes(img.read())
+            return self.convert_to_rgb()
 
     @property
     def modification_timestamp(self) -> float:

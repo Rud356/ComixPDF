@@ -5,12 +5,12 @@ are placed in files pages.
 """
 
 import textwrap
-from copy import deepcopy
+from copy import copy
 from pathlib import Path
 from typing import List, Optional
-
 from PIL import Image, UnidentifiedImageError
 
+from pathvalidate import sanitize_filename
 from comix_pdf import exceptions
 from .excluded_images import ExcludedImage, ExcludedImages
 from .image import ComicsImage
@@ -116,7 +116,7 @@ class Comics(list, List[ComicsImage]):
         self.insert(to_index, image)
 
     def render(
-        self, quality: int = 95, resolution: int = 300,
+        self, quality: int = 90, resolution: int = 300,
         fill_color: Optional[FillColor] = None
     ) -> None:
         """
@@ -129,18 +129,21 @@ class Comics(list, List[ComicsImage]):
         parameter.
         :return: nothing.
         """
-        images_render_queue: Comics = deepcopy(self)
+        images_render_queue: Comics = copy(self)
         converted_images: List[Image.Image] = []
 
         for image in images_render_queue:
-            image.load_image()
-
             if fill_color is None:
-                converted_image: Image.Image = image.convert_to_rgba()
+                converted_image: Image.Image = image.convert_to_rgb()
             else:
-                converted_image = image.convert_with_fill_color(fill_color)
+                converted_image = image.convert_to_rgb_with_fill_color(
+                    fill_color
+                )
 
             converted_images.append(converted_image)
+
+        if len(converted_images) == 0:
+            raise ValueError("No images to render as PDF")
 
         converted_images[0].save(
             self.output_file_path, "PDF", optimized=True,
@@ -162,17 +165,22 @@ class Comics(list, List[ComicsImage]):
         file name.
         :return: Instance of Comics.
         """
-        if not folder.is_dir():
-            raise exceptions.InputPathIsNotAFolder(
-                f"{folder} isn't a folder"
-            )
-
         output_file_name: str = textwrap.shorten(
             folder.name, width=251, placeholder=""
         )
         output_file_name = f"{output_file_name}.pdf"
 
         comics = cls(folder, output_file_name)
+        comics.append_from_folder(folder)
+
+        return comics
+
+    def append_from_folder(self, folder: Path) -> None:
+        if not folder.is_dir():
+            raise exceptions.InputPathIsNotAFolder(
+                f"{folder} isn't a folder"
+            )
+
         found_images: int = 0
         for filepath in filter(lambda f: f.is_file(), folder.iterdir()):
             try:
@@ -180,16 +188,13 @@ class Comics(list, List[ComicsImage]):
 
             except UnidentifiedImageError:
                 # We delete object if file isn't image
-                del image
                 continue
 
-            comics.append(image)
+            self.append(image)
             found_images += 1
 
         if not found_images:
             raise exceptions.DirectoryHasNoImages(f"{folder} has no images")
-
-        return comics
 
     @property
     def output_file_name(self) -> str:
@@ -197,10 +202,15 @@ class Comics(list, List[ComicsImage]):
 
     @output_file_name.setter
     def output_file_name(self, value: str) -> None:
+        value = sanitize_filename(value)
+        if value == "":
+            value = "Untitled"
+
         output_file_name: str = textwrap.shorten(
             value, width=251, placeholder=""
         )
-        self._output_file_name = f"{output_file_name}.pdf"
+        if not output_file_name.endswith(".pdf"):
+            self._output_file_name = f"{output_file_name}.pdf"
 
     @property
     def output_folder(self) -> Path:
