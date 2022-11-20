@@ -54,12 +54,12 @@ class Comics(list, List[ComicsImage]):
             self.pop(from_index)
         )
 
-    def exclude_image_from_output(self, image_index: int) -> None:
+    def exclude_image_from_output(self, image_index: int) -> int:
         """
         Excludes image on index from rendering to pdf.
 
         :param image_index: image index inside of comics list.
-        :return: nothing.
+        :return: index inside of comics.excluded_images for new image.
         :raises IndexError: if supplied image index is out of range.
         """
         if image_index not in range(0, len(self)):
@@ -70,6 +70,7 @@ class Comics(list, List[ComicsImage]):
             image_index
         )
         self.excluded_images.append(excluded_image)
+        return len(self.excluded_images) - 1
 
     def restore_image_from_excluded(
         self, excluded_image_index: int,

@@ -438,6 +438,7 @@ class ComixCLI:
                 "choices": [
                     Separator(" = Images = "),
                     *images_page,
+                    Separator(" = Actions = "),
                     "Insert images",
                     "Excluded images",
                     Separator(" = Change page = "),
@@ -509,7 +510,15 @@ class ComixCLI:
 
     def select_image(self, image_index: int):
         image: ComicsImage = self.comics[image_index]
+        excluded_image_at_index: int = -1
+
         while True:
+            if excluded_image_at_index == -1:
+                exclude_or_restore_text: str = "Exclude image"
+
+            else:
+                exclude_or_restore_text = "Restore image"
+
             loaded_comics_menu = [
                 {
                     "type": "list",
@@ -519,9 +528,9 @@ class ComixCLI:
                         Separator(" = Info = "),
                         Separator(f"Image index: {image_index}"),
                         Separator(f"Image name: {image.name}"),
-                        # TODO: add info about if it's excluded
+                        Separator(f"Is excluded: {excluded_image_at_index != -1}"),
                         Separator(" = Image actions = "),
-                        "Exclude image", # TODO: add isntant restore
+                        exclude_or_restore_text,
                         "Show image",
                         Separator(" = Return = "),
                         "Return to images manager",
@@ -541,7 +550,13 @@ class ComixCLI:
                 image._img.show() # noqa: need to show image
 
             elif answer == "Exclude image":
-                self.comics.exclude_image_from_output(image_index)
+                excluded_image_at_index = self.comics.exclude_image_from_output(
+                    image_index
+                )
+
+            elif answer == "Restore image":
+                self.comics.restore_image_from_excluded(excluded_image_at_index)
+                excluded_image_at_index = -1
 
             else:
                 raise ValueError(f"Unknown answer: {answer}")
@@ -650,7 +665,8 @@ class ComixCLI:
     def insert_images(self):
         try:
             image, index = self.require_image_insertion_input()
-            self.comics.insert_image(image, index)
+            self.comics.insert_image(image, index-1)
+            self.images_manager_menu()
 
         except ValueError:
             self.images_manager_menu()
@@ -658,6 +674,7 @@ class ComixCLI:
 
     def render_comics(self):
         self.comics.render(self.quality, self.resolution)
+        self.comics_loaded_menu()
 
     def close_loaded_comics(self):
         del self.comics
@@ -685,7 +702,7 @@ class ComixCLI:
         if answer["image_path"] == "x" or answer["image_index"] == "x":
             raise ValueError("Must return to previous menu")
 
-        image: ComicsImage = ComicsImage(answer["image_path"])
+        image: ComicsImage = ComicsImage(Path(answer["image_path"]))
         image_index: int = int(answer["image_index"])
 
         return image, image_index

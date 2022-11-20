@@ -23,7 +23,6 @@ class ComicsImage:
         :param path: where image is stored on disk.
         :raises PIL.UnidentifiedImageError: file is not an image.
         """
-        super().__init__()
         self.path: Path = path
 
         # Validating that file is actually an image
