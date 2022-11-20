@@ -1,28 +1,98 @@
+from os import system
+from math import ceil
 from pathlib import Path
 from sys import exit
-from typing import Optional
+from typing import Optional, List
 
-from PyInquirer import prompt
+from PyInquirer import prompt, Separator, Validator, ValidationError
 from transitions import Machine
 
-from comix_pdf.types import Comics
+from comix_pdf.types import Comics, ComicsImage
 from .states import states
 
 # How many images can be displayed on one page in menus
 IMAGES_PER_PAGE = 8
 
 
+class IntValidator(Validator):
+    def validate(self, document):
+        try:
+            if document.text == "x":
+                return
+
+            int(document.text)
+
+        except ValueError as exc:
+            raise ValidationError(
+                message="Only integer values accepted",
+                cursor_position=len(document.text)
+            ) from exc
+
+
+class PercentageValidator(IntValidator):
+    def validate(self, document):
+        super(PercentageValidator, self).validate(document)
+        if not 1 <= int(document.text) <= 100:
+            raise ValidationError(
+                message="Percentage must be between 1 and 100",
+                cursor_position=len(document.text)
+            )
+
+
+class PrintingResolutionValidator(IntValidator):
+    def validate(self, document):
+        super().validate(document)
+        if not 30 <= int(document.text) <= 1200:
+            raise ValidationError(
+                message="Percentage must be between 30 and 1200",
+                cursor_position=len(document.text)
+            )
+
+
+class PathValidator(Validator):
+    def validate(self, document):
+        try:
+            if document.text == "x":
+                return
+
+            f = Path(document.text)
+            if not f.exists():
+                raise ValueError(f"{f} doesn't exist")
+
+        except ValueError as exc:
+            raise ValidationError(
+                message="Only existing paths accepted",
+                cursor_position=len(document.text)
+            ) from exc
+
+
+def clear() -> None:
+    """
+    Clears console from text.
+
+    :return: nothing.
+    """
+    print("\033[H\033[J", end="")
+
+
 class ComixCLI:
     state: str
     comics: Optional[Comics]
     loaded_from_folder: Optional[Path]
+    page: int
+    total_pages: int
+    sort_in_reverse: bool
 
     def __init__(self):
         # Maybe will add more translations
-        self.resolution = 300
-        self.quality = 90
+        self.resolution: int = 300
+        self.quality: int = 90
         self.language = "en"
-
+        self.sort_in_reverse = False
+        self.page = 1
+        self.total_pages = 0
+        self.excluded_images_page = 1
+        self.excluded_images_pages_total = 0
         self.machine = Machine(
             model=self, states=states, initial="start menu",
         )
@@ -83,8 +153,8 @@ class ComixCLI:
 
         # Image manager states
         self.machine.add_transition(
-            trigger="exclude_selected_images", source="images manager",
-            dest="exclude images"
+            trigger="excluded_images", source="images manager",
+            dest="excluded images"
         )
         self.machine.add_transition(
             trigger="select_image", source="images manager",
@@ -96,17 +166,22 @@ class ComixCLI:
         )
 
         # Start CLI
-        self.draw_start_menu()
+        self.output_start_menu()
 
-    def draw_start_menu(self):
+    def output_start_menu(self):
+        clear()
+        print(
+            "Welcome to ComixPDF! By @Rud356",
+            "Current language is {self.language}",
+            sep="\n"
+        )
+
         start_menu = [
             {
                 "type": "list",
                 "name": "option",
                 "message": (
-                    "Welcome to ComixPDF! By @Rud356\n"
-                    "Current language is {self.language}\n"
-                    "\nWhat action you want to do?"
+                    "What action you want to do?"
                 ),
                 "choices": [
                     "Load comics from directory",
@@ -139,7 +214,8 @@ class ComixCLI:
                 "name": "comics_path",
                 "message":
                     'To close this menu type "x"\n'
-                    "Input path form where to load pictures:"
+                    "Input path form where to load pictures:",
+                "validate": PathValidator
             }
         ]
         path_input = prompt(load_menu)
@@ -148,7 +224,7 @@ class ComixCLI:
         while not path.is_dir():
             if path_input["comics_path"].lower() == "x":
                 # Stopping function execution
-                self.draw_start_menu()
+                self.output_start_menu()
                 return
 
             path: Path = Path(path_input["comics_path"])
@@ -170,6 +246,7 @@ class ComixCLI:
                 path_input = prompt(load_menu)
 
         self.comics = Comics.load_from_folder(path)
+        self.total_pages = ceil(len(self.comics) / IMAGES_PER_PAGE)
         self.comics_loaded_menu()
 
     def create_empty_comics(self):
@@ -180,7 +257,68 @@ class ComixCLI:
         self.comics_loaded_menu()
 
     def comics_loaded_menu(self):
-        pass
+        clear()
+        print(
+            'Current language is "{0}"'.format(self.language),
+            "-- Information about loaded comics --",
+            "Output file name: {0}".format(self.comics.output_file_name),
+            "Output file path: {0}".format(self.comics.output_file_path),
+            "Images included in final PDF: {0}".format(len(self.comics)),
+            "Images excluded from final PDF: {0}".format(
+                len(self.comics.excluded_images)
+            ),
+            "Images quality: {0}%".format(self.quality),
+            "PDF printing resolution: {0}dpi\n".format(self.resolution),
+            sep="\n"
+        )
+        loaded_comics_menu = [
+            {
+                "type": "list",
+                "name": "option",
+                "message": "Select action: ",
+                "choices": [
+                    Separator(" = Output settings = "),
+                    "Set comics name",
+                    "Set comics output path",
+                    "Set images quality",
+                    "Set printing resolution",
+                    Separator(" = Comics management = "),
+                    "Images manager",
+                    "Render comics",
+                    Separator(" = Finishing working = "),
+                    "Close loaded comics",
+                    "Exit"
+                ]
+            }
+        ]
+        answer = prompt(loaded_comics_menu)
+
+        if answer == "Set comics name":
+            self.set_comics_name()
+
+        elif answer == "Set comics output path":
+            self.set_comics_output_path()
+
+        elif answer == "Set images quality":
+            self.set_images_quality()
+
+        elif answer == "Set printing resolution":
+            self.set_printing_resolution()
+
+        elif answer == "Images manager":
+            self.images_manager_menu()
+
+        elif answer == "Render comics":
+            self.render_comics()
+
+        elif answer == "Close loaded comics":
+            self.close_loaded_comics()
+
+        elif answer == "Exit":
+            exit(0)
+
+        else:
+            raise ValueError(f"Unknown answer: {answer}")
 
     def set_comics_name(self):
         comics_name_prompt = [
@@ -239,26 +377,309 @@ class ComixCLI:
             self.comics_loaded_menu()
 
     def set_images_quality(self):
-        self.comics_loaded_menu()
+        input_image = [
+            {
+                "type": "input",
+                "name": "image_quality",
+                "message":
+                    'Input "x" to close this menu\n'
+                    "Input image quality which you would like (between 1 and 100):",
+                "validate": PercentageValidator
+            }
+        ]
+        answer: dict = prompt(input_image)
+        if answer["image_quality"] == "x":
+            self.comics_loaded_menu()
+            return
+
+        self.quality = int(answer["image_quality"])
 
     def set_printing_resolution(self):
-        self.comics_loaded_menu()
+        input_image = [
+            {
+                "type": "input",
+                "name": "image_printing",
+                "message":
+                    'Input "x" to close this menu\n'
+                    "Input image quality which you would like (between 1 and 100):",
+                "validate": PrintingResolutionValidator
+            }
+        ]
+        answer: dict = prompt(input_image)
+        if answer["image_printing"] == "x":
+            self.comics_loaded_menu()
+            return
+
+        self.resolution = int(answer["image_printing"])
 
     def images_manager_menu(self):
-        pass
+        clear()
+        # Text about what will be next state of sorting
+        if not self.sort_in_reverse:
+            setting_sorting_mode_to: str = 'reverse'
+        else:
+            setting_sorting_mode_to = 'normal'
 
-    def select_image(self):
-        pass
+        # Prepares page to be displayed in menu
+        current_comics_displayed_pages = self.current_page
+        images_page: list[str] = [
+            f"{n}. {img.path.name}" for n, img in enumerate(
+                current_comics_displayed_pages,
+                start=1 + self.page*IMAGES_PER_PAGE
+            )
+        ]
 
-    def exclude_selected_images(self):
-        pass
+        loaded_comics_menu = [
+            {
+                "type": "list",
+                "name": "option",
+                "message": "Select action with images: ",
+                "choices": [
+                    Separator(" = Images = "),
+                    *images_page,
+                    "Insert images",
+                    "Excluded images",
+                    Separator(" = Change page = "),
+                    Separator(f"Current page: {self.page}"),
+                    "Previous page",
+                    "Next page",
+                    Separator(" = Sorting = "),
+                    "Sort by names",
+                    "Sort by dates modified",
+                    f"Change current sorting order to: {setting_sorting_mode_to}",
+                    Separator(" = Return = "),
+                    "Return to comics menu",
+                    "Exit"
+                ]
+            }
+        ]
+
+        answer: str = prompt(loaded_comics_menu)
+
+        if answer == "Previous page":
+            # If we're still not on first page - we can go back
+            if self.page > 1:
+                self.page -= 1
+                self.images_manager_menu()
+
+        elif answer == "Next page":
+            # If we still hadn't reached final page - it is fine
+            if self.page <= self.total_pages:
+                self.page += 1
+                self.images_manager_menu()
+
+        elif answer == "Sort by names":
+            self.comics.sort(
+                reverse=self.sort_in_reverse,
+                key=lambda img: img.name
+            )
+
+        elif answer == "Sort by dates modified":
+            self.comics.sort(
+                reverse=self.sort_in_reverse,
+                key=lambda img: img.modification_timestamp
+            )
+
+        elif answer == "Return to comics menu":
+            self.load_comics_menu()
+
+        elif answer == "Excluded images":
+            self.excluded_images()
+
+        elif answer == "Exit":
+            exit(0)
+
+        elif answer == "Insert images":
+            self.insert_images()
+
+        elif answer.startswith("Change current sorting order to"):
+            self.sort_in_reverse = not self.sort_in_reverse
+            self.images_manager_menu()
+
+        elif answer.split(".")[0].isdecimal():
+            image_index: int = int(answer.split(".")[0])
+            self.select_image(image_index)
+
+        else:
+            raise ValueError(f"Unknown answer: {answer}")
+
+    def select_image(self, image_index: int):
+        image: ComicsImage = self.comics[image_index]
+        while True:
+            loaded_comics_menu = [
+                {
+                    "type": "list",
+                    "name": "option",
+                    "message": "Select action with images: ",
+                    "choices": [
+                        Separator(" = Info = "),
+                        Separator(f"Image index: {image_index}"),
+                        Separator(f"Image name: {image.name}"),
+                        Separator(" = Image actions = "),
+                        "Exclude image"
+                        "Show image",
+                        Separator(" = Return = "),
+                        "Return to images manager",
+                        "Exit"
+                    ]
+                }
+            ]
+            answer: str = prompt(loaded_comics_menu)
+
+            if answer == "Return to images manager":
+                self.images_manager_menu()
+
+            elif answer == "Exit":
+                exit(0)
+
+            elif answer == "Show image":
+                image._img.show() # noqa: need to show image
+
+            elif answer == "Exclude image":
+                self.comics.exclude_image_from_output(image_index)
+
+            else:
+                raise ValueError(f"Unknown answer: {answer}")
+
+    @property
+    def current_page(self) -> Comics[ComicsImage]:
+        current_comics_page: Comics[ComicsImage] = self.comics[
+            (self.page - 1) * IMAGES_PER_PAGE:self.page * IMAGES_PER_PAGE
+        ]
+        return current_comics_page
+
+    @property
+    def current_excluded_page(self) -> Comics[ComicsImage]:
+        current_comics_page: Comics[ComicsImage] = self.comics.excluded_images[
+            (self.excluded_images_page - 1) * IMAGES_PER_PAGE:
+            self.excluded_images_page * IMAGES_PER_PAGE
+        ]
+        return current_comics_page
+
+    def excluded_images(self):
+        while True:
+            images_page: list[ComicsImage] = self.current_excluded_page
+            loaded_comics_menu = [
+                {
+                    "type": "list",
+                    "name": "option",
+                    "message": "Select action with images: ",
+                    "choices": [
+                        Separator(" = Images = "),
+                        *[f"{original_index}. {img.name}\n" for img, original_index in images_page],
+                        Separator(" = Change page = "),
+                        Separator(f"Current page: {self.page}"),
+                        "Previous page",
+                        "Next page",
+                        Separator(" = Return = "),
+                        "Return to images menu",
+                        "Exit"
+                    ]
+                }
+            ]
+
+            answer: str = prompt(loaded_comics_menu)
+
+            if answer == "Previous page":
+                # If we're still not on first page - we can go back
+                if self.page > 1:
+                    self.page -= 1
+                    self.images_manager_menu()
+
+            elif answer == "Next page":
+                # If we still hadn't reached final page - it is fine
+                if self.page <= self.total_pages:
+                    self.page += 1
+                    self.images_manager_menu()
+
+            elif answer == "Return to images menu":
+                self.images_manager_menu()
+
+            elif answer == "Excluded images":
+                self.excluded_images()
+
+            elif answer == "Exit":
+                exit(0)
+
+            elif answer.split(".")[0].isdecimal():
+                image_index: int = int(answer.split(".")[0])
+                image: ComicsImage = self.comics[image_index]
+
+                while True:
+                    loaded_comics_menu = [
+                        {
+                            "type": "list",
+                            "name": "option",
+                            "message": "Select action with images: ",
+                            "choices": [
+                                Separator(" = Info = "),
+                                Separator(f"Image index: {image}"),
+                                Separator(f"Image name: {image.name}"),
+                                Separator(" = Image actions = "),
+                                "Restore image",
+                                "Show image",
+                                Separator(" = Return = "),
+                                "Return to images manager",
+                                "Exit"
+                            ]
+                        }
+                    ]
+                    answer: str = prompt(loaded_comics_menu)
+
+                    if answer == "Return to excluded images manager":
+                        break
+
+                    elif answer == "Exit":
+                        exit(0)
+
+                    elif answer == "Show image":
+                        image._img.show()  # noqa: need to show image
+
+                    elif answer == "Exclude image":
+                        self.comics.exclude_image_from_output(image_index)
+
+                    else:
+                        raise ValueError(f"Unknown answer: {answer}")
 
     def insert_images(self):
-        pass
+        try:
+            image, index = self.require_image_insertion_input()
+            self.comics.insert_image(image, index)
+
+        except ValueError:
+            self.images_manager_menu()
+            return
 
     def render_comics(self):
-        pass
+        self.comics.render(self.quality, self.resolution)
 
     def close_loaded_comics(self):
         del self.comics
-        self.draw_start_menu()
+        self.output_start_menu()
+
+    def require_image_insertion_input(self) -> (ComicsImage, int):
+        input_image = [
+            {
+                "type": "input",
+                "name": "image_path",
+                "message":
+                    'To close this menu - type "x"\n'
+                    "Input path form where to load picture:",
+                "validate": PathValidator
+            },
+            {
+                "type": "input",
+                "name": "image_index",
+                "message":
+                    "Input index to which you wish insert image:",
+                "validate": IntValidator
+            }
+        ]
+        answer: dict = prompt(input_image)
+        if answer["image_path"] == "x" or answer["image_index"] == "x":
+            raise ValueError("Must return to previous menu")
+
+        image: ComicsImage = ComicsImage(answer["image_path"])
+        image_index: int = int(answer["image_index"])
+
+        return image, image_index

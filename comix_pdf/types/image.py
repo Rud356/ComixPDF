@@ -66,3 +66,7 @@ class ComicsImage:
         :return: when image was modified last time in unix time format.
         """
         return self.path.lstat().st_mtime
+
+    @property
+    def name(self) -> str:
+        return self.path.name

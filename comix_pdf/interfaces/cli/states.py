@@ -11,7 +11,7 @@ states = [
     "actions on image",
     "insert images",
     "move image to index",
-    "exclude images",
+    "excluded images",
     "rendering pdf",
     "close loaded comics",
 ]
