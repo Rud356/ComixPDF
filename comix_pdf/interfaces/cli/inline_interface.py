@@ -21,7 +21,7 @@ parser.add_argument(
     "--paths",
     "-p", type=str,
     default=[],
-    nargs="*",
+    nargs="+",
     action="store",
     dest="parts_paths",
     help="Pass here directories or some images paths you would like insert"
