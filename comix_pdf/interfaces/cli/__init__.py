@@ -1,7 +1,8 @@
 from .inline_interface import parser, inline_render
 
-parsed_args = parser.parse_known_args()
-args = parsed_args[0]
+
+args, _ = parser.parse_known_args()
+
 
 if len(args.parts_paths):
     from pathlib import Path
