@@ -7,7 +7,7 @@ from typing import Optional, List
 from PyInquirer import prompt, Separator, Validator, ValidationError
 from transitions import Machine
 
-from comix_pdf.types import Comics, ComicsImage
+from comix_pdf.types import Comics, ComicsImage, ExcludedImage
 from .states import states
 
 # How many images can be displayed on one page in menus
@@ -291,7 +291,7 @@ class ComixCLI:
                 ]
             }
         ]
-        answer = prompt(loaded_comics_menu)
+        answer = prompt(loaded_comics_menu)['option']
 
         if answer == "Set comics name":
             self.set_comics_name()
@@ -332,7 +332,7 @@ class ComixCLI:
         ]
         file_name_input = prompt(comics_name_prompt)
         if file_name_input["comics_name"] != "x":
-            self.comics = file_name_input["comics_name"]
+            self.comics.output_file_name = file_name_input["comics_name"]
 
         self.comics_loaded_menu()
 
@@ -343,7 +343,7 @@ class ComixCLI:
                 "name": "comics_path",
                 "message":
                     'To close this menu - type "x"\n'
-                    "Input path form where to load pictures:"
+                    "Input path where comics will be saved:"
             }
         ]
         path_input = prompt(output_comics_prompt)
@@ -356,8 +356,8 @@ class ComixCLI:
                 self.comics.output_file_path = path.parent
                 break
 
-            elif path.is_dir():
-                self.comics.output_file_path = path
+            elif path.is_dir() and path != Path('.'):
+                self.comics.output_folder = path
                 break
 
             else:
@@ -368,13 +368,12 @@ class ComixCLI:
                         "message":
                             "Previous input was not a path, which is required\n"
                             'To close this menu type "x"\n'
-                            "Input path form where to load pictures:"
+                            "Input path where comics will be saved:"
                     }
                 ]
                 path_input = prompt(output_comics_prompt)
 
-        else:
-            self.comics_loaded_menu()
+        self.comics_loaded_menu()
 
     def set_images_quality(self):
         input_image = [
@@ -393,6 +392,7 @@ class ComixCLI:
             return
 
         self.quality = int(answer["image_quality"])
+        self.comics_loaded_menu()
 
     def set_printing_resolution(self):
         input_image = [
@@ -401,7 +401,7 @@ class ComixCLI:
                 "name": "image_printing",
                 "message":
                     'Input "x" to close this menu\n'
-                    "Input image quality which you would like (between 1 and 100):",
+                    "Input image printing quality which you would like (between 30 and 1200):",
                 "validate": PrintingResolutionValidator
             }
         ]
@@ -411,6 +411,7 @@ class ComixCLI:
             return
 
         self.resolution = int(answer["image_printing"])
+        self.comics_loaded_menu()
 
     def images_manager_menu(self):
         clear()
@@ -425,7 +426,7 @@ class ComixCLI:
         images_page: list[str] = [
             f"{n}. {img.path.name}" for n, img in enumerate(
                 current_comics_displayed_pages,
-                start=1 + self.page*IMAGES_PER_PAGE
+                start=1 + (self.page-1)*IMAGES_PER_PAGE
             )
         ]
 
@@ -454,34 +455,36 @@ class ComixCLI:
             }
         ]
 
-        answer: str = prompt(loaded_comics_menu)
+        answer: str = prompt(loaded_comics_menu)["option"]
 
         if answer == "Previous page":
             # If we're still not on first page - we can go back
             if self.page > 1:
                 self.page -= 1
-                self.images_manager_menu()
+            self.images_manager_menu()
 
         elif answer == "Next page":
             # If we still hadn't reached final page - it is fine
-            if self.page <= self.total_pages:
+            if self.page < self.total_pages:
                 self.page += 1
-                self.images_manager_menu()
+            self.images_manager_menu()
 
         elif answer == "Sort by names":
             self.comics.sort(
                 reverse=self.sort_in_reverse,
                 key=lambda img: img.name
             )
+            self.images_manager_menu()
 
         elif answer == "Sort by dates modified":
             self.comics.sort(
                 reverse=self.sort_in_reverse,
                 key=lambda img: img.modification_timestamp
             )
+            self.images_manager_menu()
 
         elif answer == "Return to comics menu":
-            self.load_comics_menu()
+            self.comics_loaded_menu()
 
         elif answer == "Excluded images":
             self.excluded_images()
@@ -494,6 +497,7 @@ class ComixCLI:
 
         elif answer.startswith("Change current sorting order to"):
             self.sort_in_reverse = not self.sort_in_reverse
+            self.comics.reverse()
             self.images_manager_menu()
 
         elif answer.split(".")[0].isdecimal():
@@ -515,8 +519,9 @@ class ComixCLI:
                         Separator(" = Info = "),
                         Separator(f"Image index: {image_index}"),
                         Separator(f"Image name: {image.name}"),
+                        # TODO: add info about if it's excluded
                         Separator(" = Image actions = "),
-                        "Exclude image"
+                        "Exclude image", # TODO: add isntant restore
                         "Show image",
                         Separator(" = Return = "),
                         "Return to images manager",
@@ -524,7 +529,7 @@ class ComixCLI:
                     ]
                 }
             ]
-            answer: str = prompt(loaded_comics_menu)
+            answer: str = prompt(loaded_comics_menu)['option']
 
             if answer == "Return to images manager":
                 self.images_manager_menu()
@@ -578,19 +583,19 @@ class ComixCLI:
                 }
             ]
 
-            answer: str = prompt(loaded_comics_menu)
+            answer: str = prompt(loaded_comics_menu)['option']
 
             if answer == "Previous page":
                 # If we're still not on first page - we can go back
                 if self.page > 1:
                     self.page -= 1
-                    self.images_manager_menu()
+                self.excluded_images()
 
             elif answer == "Next page":
                 # If we still hadn't reached final page - it is fine
-                if self.page <= self.total_pages:
+                if self.page < self.total_pages:
                     self.page += 1
-                    self.images_manager_menu()
+                self.excluded_images()
 
             elif answer == "Return to images menu":
                 self.images_manager_menu()
@@ -602,8 +607,8 @@ class ComixCLI:
                 exit(0)
 
             elif answer.split(".")[0].isdecimal():
-                image_index: int = int(answer.split(".")[0])
-                image: ComicsImage = self.comics[image_index]
+                image_index: int = int(answer.split(".")[0]) - 1
+                excluded_image: ExcludedImage = self.comics.excluded_images[image_index]
 
                 while True:
                     loaded_comics_menu = [
@@ -613,18 +618,18 @@ class ComixCLI:
                             "message": "Select action with images: ",
                             "choices": [
                                 Separator(" = Info = "),
-                                Separator(f"Image index: {image}"),
-                                Separator(f"Image name: {image.name}"),
+                                Separator(f"Image index: {image_index+1}"),
+                                Separator(f"Image name: {excluded_image.image.name}"),
                                 Separator(" = Image actions = "),
                                 "Restore image",
                                 "Show image",
                                 Separator(" = Return = "),
-                                "Return to images manager",
+                                "Return to excluded images manager",
                                 "Exit"
                             ]
                         }
                     ]
-                    answer: str = prompt(loaded_comics_menu)
+                    answer: str = prompt(loaded_comics_menu)['option']
 
                     if answer == "Return to excluded images manager":
                         break
@@ -633,10 +638,11 @@ class ComixCLI:
                         exit(0)
 
                     elif answer == "Show image":
-                        image._img.show()  # noqa: need to show image
+                        excluded_image._img.show()  # noqa: need to show image
 
-                    elif answer == "Exclude image":
-                        self.comics.exclude_image_from_output(image_index)
+                    elif answer == "Restore image":
+                        self.comics.restore_image_from_excluded(image_index)
+                        break
 
                     else:
                         raise ValueError(f"Unknown answer: {answer}")

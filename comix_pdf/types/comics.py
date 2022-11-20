@@ -212,6 +212,9 @@ class Comics(list, List[ComicsImage]):
         if not output_file_name.endswith(".pdf"):
             self._output_file_name = f"{output_file_name}.pdf"
 
+        else:
+            self._output_file_name = output_file_name
+
     @property
     def output_folder(self) -> Path:
         return self._output_folder
