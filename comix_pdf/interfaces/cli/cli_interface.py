@@ -1,10 +1,11 @@
-from os import system
 from math import ceil
 from pathlib import Path
 from sys import exit
-from typing import Optional, List
+from typing import Optional
 
-from PyInquirer import prompt, Separator, Validator, ValidationError
+from InquirerPy import prompt
+from InquirerPy.separator import Separator
+from prompt_toolkit.validation import ValidationError, Validator
 from transitions import Machine
 
 from comix_pdf.types import Comics, ComicsImage, ExcludedImage
@@ -15,56 +16,60 @@ IMAGES_PER_PAGE = 8
 
 
 class IntValidator(Validator):
-    def validate(self, document):
+    def validate(self, document: str):
         try:
-            if document.text == "x":
+            if document == "x":
                 return
 
-            int(document.text)
+            int(document)
 
         except ValueError as exc:
             raise ValidationError(
                 message="Only integer values accepted",
-                cursor_position=len(document.text)
+                cursor_position=len(document)
             ) from exc
 
 
 class PercentageValidator(IntValidator):
-    def validate(self, document):
+    def validate(self, document: str):
         super(PercentageValidator, self).validate(document)
-        if not 1 <= int(document.text) <= 100:
+        if not 1 <= int(document) <= 100:
             raise ValidationError(
                 message="Percentage must be between 1 and 100",
-                cursor_position=len(document.text)
+                cursor_position=len(document)
             )
+
+        return True
 
 
 class PrintingResolutionValidator(IntValidator):
-    def validate(self, document):
+    def validate(self, document: str):
         super().validate(document)
-        if not 30 <= int(document.text) <= 1200:
+        if not 30 <= int(document) <= 1200:
             raise ValidationError(
                 message="Percentage must be between 30 and 1200",
-                cursor_position=len(document.text)
+                cursor_position=len(document)
             )
 
+        return True
 
 class PathValidator(Validator):
-    def validate(self, document):
+    def validate(self, document: str):
         try:
-            if document.text == "x":
-                return
+            if document == "x":
+                return True
 
-            f = Path(document.text)
+            f = Path(document)
             if not f.exists():
                 raise ValueError(f"{f} doesn't exist")
 
         except ValueError as exc:
             raise ValidationError(
                 message="Only existing paths accepted",
-                cursor_position=len(document.text)
+                cursor_position=len(document)
             ) from exc
 
+        return True
 
 def clear() -> None:
     """
@@ -215,7 +220,7 @@ class ComixCLI:
                 "message":
                     'To close this menu type "x"\n'
                     "Input path form where to load pictures:",
-                "validate": PathValidator
+                "validate": PathValidator().validate
             }
         ]
         path_input = prompt(load_menu)
@@ -383,7 +388,7 @@ class ComixCLI:
                 "message":
                     'Input "x" to close this menu\n'
                     "Input image quality which you would like (between 1 and 100):",
-                "validate": PercentageValidator
+                "validate": PercentageValidator().validate
             }
         ]
         answer: dict = prompt(input_image)
@@ -688,14 +693,14 @@ class ComixCLI:
                 "message":
                     'To close this menu - type "x"\n'
                     "Input path form where to load picture:",
-                "validate": PathValidator
+                "validate": PathValidator().validate
             },
             {
                 "type": "input",
                 "name": "image_index",
                 "message":
                     "Input index to which you wish insert image:",
-                "validate": IntValidator
+                "validate": IntValidator().validate
             }
         ]
         answer: dict = prompt(input_image)

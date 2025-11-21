@@ -1,4 +1,4 @@
 Pillow>=9.0.0
-transitions==0.8.11
-PyInquirer~=1.0.3
-pathvalidate~=2.5.0
+transitions~=0.9.3
+InquirerPy~=0.3.4
+pathvalidate~=3.3.1

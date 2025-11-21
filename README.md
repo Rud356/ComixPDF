@@ -1,5 +1,5 @@
 # ComixPDF
-Simple util to convert bunch of images into one pdf file using python and PIL
+Simple util to convert a bunch of images into one pdf file using python and PIL
 
 ## Installation
 ### Requirements
@@ -22,4 +22,4 @@ wrap them with `""`.
 that will be included into pdf
 * `--output-dir` or `-od` - where final pdf will be stored
 * `--resolution` or `-res` - sets printing resolution (in dpi)
-* `--quality` or `-q` - sets output images quality inside of pdf (% from original)
+* `--quality` or `-q` - sets output images quality inside pdf (% from original)
